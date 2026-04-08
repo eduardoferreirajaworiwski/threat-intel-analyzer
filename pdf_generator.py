@@ -197,5 +197,5 @@ def generate_pdf_report(df: pd.DataFrame) -> bytes:
     pdf.top_ports_table(df)
     pdf.top_attackers_table(df)
     
-    # Retorna array de bytes sem salvar no disco
-    return pdf.output(dest='S')
+    # Retorna array de bytes sem salvar no disco (convertido para o stream_bytes suportado pelo st.download_button)
+    return bytes(pdf.output())

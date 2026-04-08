@@ -11,8 +11,10 @@ Dependências:
 """
 
 import os
+import os
 import io
 import time
+import tempfile
 
 import pandas as pd
 import plotly.express as px
@@ -23,7 +25,8 @@ from dotenv import load_dotenv
 import column_detector
 import pdf_generator
 
-load_dotenv()
+# 'override=True' garante que se rodar o Streamlit e depois editar o .env, ele atualiza!
+load_dotenv(override=True)
 
 # =============================================================================
 # CONFIGURAÇÃO DA PÁGINA — deve ser a PRIMEIRA chamada Streamlit
@@ -37,228 +40,6 @@ st.set_page_config(
 )
 
 # =============================================================================
-# TEMA E ESTILOS GLOBAIS (Cybersecurity Dark)
-# =============================================================================
-
-CUSTOM_CSS = """
-<style>
-  /* ── Google Font ────────────────────────────────── */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
-
-  /* ── Reset global ───────────────────────────────── */
-  html, body, [class*="css"] {
-    font-family: 'Inter', sans-serif;
-  }
-
-  /* ── Fundo principal ────────────────────────────── */
-  .stApp {
-    background: #07090f;
-    background-image:
-      radial-gradient(ellipse at 20% 10%, rgba(0,255,136,0.04) 0%, transparent 60%),
-      radial-gradient(ellipse at 80% 80%, rgba(99,102,241,0.06) 0%, transparent 60%);
-  }
-
-  /* ── Sidebar ────────────────────────────────────── */
-  section[data-testid="stSidebar"] {
-    background: #0d111d;
-    border-right: 1px solid rgba(0,255,136,0.12);
-  }
-  section[data-testid="stSidebar"] * {
-    color: #a0aec0 !important;
-  }
-  section[data-testid="stSidebar"] h1,
-  section[data-testid="stSidebar"] h2,
-  section[data-testid="stSidebar"] h3 {
-    color: #00ff88 !important;
-  }
-
-  /* ── Cabeçalho do dashboard ─────────────────────── */
-  .dash-header {
-    padding: 2rem 0 1.5rem 0;
-    border-bottom: 1px solid rgba(0,255,136,0.15);
-    margin-bottom: 2rem;
-  }
-  .dash-title {
-    font-size: 2.4rem;
-    font-weight: 900;
-    letter-spacing: -0.5px;
-    background: linear-gradient(135deg, #00ff88 0%, #00d4ff 50%, #6366f1 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    margin: 0;
-    line-height: 1.2;
-  }
-  .dash-subtitle {
-    color: #4a5568;
-    font-size: 0.95rem;
-    margin-top: 0.4rem;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  /* ── Metric Cards ───────────────────────────────── */
-  .metric-card {
-    background: linear-gradient(135deg, #0d111d 0%, #111827 100%);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 16px;
-    padding: 1.5rem 1.8rem;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  .metric-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-  }
-  .metric-card::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    border-radius: 16px 16px 0 0;
-  }
-  .metric-card.blue::before  { background: linear-gradient(90deg, #00d4ff, #6366f1); }
-  .metric-card.red::before   { background: linear-gradient(90deg, #ff4757, #ff6b6b); }
-  .metric-card.orange::before{ background: linear-gradient(90deg, #ffa502, #ff6348); }
-
-  .metric-icon {
-    font-size: 1.8rem;
-    margin-bottom: 0.8rem;
-    display: block;
-  }
-  .metric-label {
-    color: #4a5568;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    margin-bottom: 0.4rem;
-    font-family: 'JetBrains Mono', monospace;
-  }
-  .metric-value {
-    font-size: 2.8rem;
-    font-weight: 900;
-    line-height: 1;
-    margin: 0;
-  }
-  .metric-value.blue   { color: #00d4ff; }
-  .metric-value.red    { color: #ff4757; }
-  .metric-value.orange { color: #ffa502; }
-  .metric-delta {
-    font-size: 0.78rem;
-    color: #4a5568;
-    margin-top: 0.6rem;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  /* ── Section headers ────────────────────────────── */
-  .section-header {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    margin: 2rem 0 1rem 0;
-    padding-bottom: 0.6rem;
-    border-bottom: 1px solid rgba(255,255,255,0.06);
-  }
-  .section-header h3 {
-    color: #e2e8f0;
-    font-size: 1rem;
-    font-weight: 600;
-    margin: 0;
-    letter-spacing: 0.3px;
-  }
-  .section-badge {
-    background: rgba(0,255,136,0.1);
-    color: #00ff88;
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    font-family: 'JetBrains Mono', monospace;
-  }
-
-  /* ── Alert banners ──────────────────────────────── */
-  .alert-warning {
-    background: rgba(255, 165, 2, 0.08);
-    border: 1px solid rgba(255, 165, 2, 0.3);
-    border-left: 3px solid #ffa502;
-    border-radius: 8px;
-    padding: 1rem 1.2rem;
-    color: #ffa502;
-    font-size: 0.88rem;
-    margin: 1rem 0;
-  }
-  .alert-info {
-    background: rgba(0, 212, 255, 0.06);
-    border: 1px solid rgba(0, 212, 255, 0.2);
-    border-left: 3px solid #00d4ff;
-    border-radius: 8px;
-    padding: 1rem 1.2rem;
-    color: #00d4ff;
-    font-size: 0.88rem;
-    margin: 1rem 0;
-  }
-  .alert-success {
-    background: rgba(0, 255, 136, 0.06);
-    border: 1px solid rgba(0, 255, 136, 0.2);
-    border-left: 3px solid #00ff88;
-    border-radius: 8px;
-    padding: 1rem 1.2rem;
-    color: #00ff88;
-    font-size: 0.88rem;
-    margin: 1rem 0;
-  }
-
-  /* ── Dataframe container ────────────────────────── */
-  .stDataFrame {
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.06) !important;
-  }
-
-  /* ── Botões ─────────────────────────────────────── */
-  .stButton > button {
-    background: linear-gradient(135deg, #00ff88, #00d4ff);
-    color: #07090f;
-    font-weight: 700;
-    border: none;
-    border-radius: 10px;
-    padding: 0.7rem 2rem;
-    font-size: 0.9rem;
-    letter-spacing: 0.3px;
-    transition: opacity 0.2s, transform 0.2s;
-    width: 100%;
-  }
-  .stButton > button:hover {
-    opacity: 0.9;
-    transform: translateY(-1px);
-  }
-
-  /* ── File uploader ──────────────────────────────── */
-  [data-testid="stFileUploader"] {
-    background: rgba(255,255,255,0.02);
-    border: 1px dashed rgba(0,255,136,0.25);
-    border-radius: 10px;
-    padding: 0.5rem;
-  }
-
-  /* ── Divider ────────────────────────────────────── */
-  hr {
-    border-color: rgba(255,255,255,0.06) !important;
-  }
-
-  /* ── Scrollbar ──────────────────────────────────── */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #07090f; }
-  ::-webkit-scrollbar-thumb { background: #1a2234; border-radius: 3px; }
-</style>
-"""
-
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
-
 # =============================================================================
 # HELPERS
 # =============================================================================
@@ -275,23 +56,17 @@ def metric_card(label: str, value, color: str, icon: str, delta: str = "") -> st
     """
 
 
-def section_header(title: str, badge: str = "") -> str:
-    badge_html = f'<span class="section-badge">{badge}</span>' if badge else ""
-    return f"""
-    <div class="section-header">
-      <h3>{title}</h3>
-      {badge_html}
-    </div>
-    """
-
-
 def check_api_keys() -> tuple[bool, list[str]]:
     """Verifica quais chaves de API estão configuradas."""
     missing = []
-    if not os.getenv("VT_API_KEY"):
+    vt = os.getenv("VT_API_KEY")
+    sh = os.getenv("SHODAN_API_KEY")
+    
+    if not vt or vt == "sua_chave_virustotal_aqui":
         missing.append("VT_API_KEY")
-    if not os.getenv("SHODAN_API_KEY"):
+    if not sh or sh == "sua_chave_shodan_aqui":
         missing.append("SHODAN_API_KEY")
+        
     return len(missing) == 0, missing
 
 
@@ -345,11 +120,10 @@ def run_analysis(log_file_path: str) -> pd.DataFrame | None:
     total = len(ips)
     rate_limit_sec = 15
 
-    st.markdown(
-        f'<div class="alert-info">⏱️ Analisando <strong>{total} IPs únicos</strong>. '
-        f'Tempo estimado: ~{total * rate_limit_sec // 60} min {total * rate_limit_sec % 60} s '
-        f'(rate limit VirusTotal: {rate_limit_sec}s/req)</div>',
-        unsafe_allow_html=True,
+    st.info(
+        f"⏱️ Analisando **{total} IPs únicos**. "
+        f"Tempo estimado: ~{total * rate_limit_sec // 60} min {total * rate_limit_sec % 60} s "
+        f"(rate limit VirusTotal: {rate_limit_sec}s/req)"
     )
 
     progress_bar = st.progress(0, text="Iniciando análise de Threat Intelligence...")
@@ -365,10 +139,7 @@ def run_analysis(log_file_path: str) -> pd.DataFrame | None:
     shodan_client = shodan_lib.Shodan(SHODAN_KEY)
 
     for idx, ip in enumerate(ips):
-        status_box.markdown(
-            f'<div class="alert-info">🔍 [{idx+1}/{total}] Consultando: <code>{ip}</code></div>',
-            unsafe_allow_html=True,
-        )
+        status_box.info(f"🔍 [{idx+1}/{total}] Consultando: `{ip}`")
 
         # VirusTotal
         time.sleep(rate_limit_sec)
@@ -421,6 +192,11 @@ def run_analysis(log_file_path: str) -> pd.DataFrame | None:
 # SIDEBAR
 # =============================================================================
 
+# Tratamento do redirecionamento após a Análise Completa terminar
+if st.session_state.pop("_redirect_to_enriched", False):
+    st.session_state["data_source_radio"] = "Usar arquivo local"
+    st.session_state["selected_local_file"] = "📊 Relatório enriquecido (threat_intel_report.csv)"
+
 with st.sidebar:
     st.markdown("""
     <div style="text-align:center; padding: 1rem 0 1.5rem 0;">
@@ -437,10 +213,14 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 📂 Fonte de Dados")
 
+    if "data_source_radio" not in st.session_state:
+        st.session_state["data_source_radio"] = "Usar arquivo local"
+
     data_source = st.radio(
         "Selecione a origem dos dados:",
         options=["Usar arquivo local", "Upload de CSV"],
         help="Use o arquivo gerado pelo generate_logs.py ou faça upload de um CSV personalizado.",
+        key="data_source_radio"
     )
 
     uploaded_df = None
@@ -464,7 +244,15 @@ with st.sidebar:
             "📊 Relatório enriquecido (threat_intel_report.csv)": "threat_intel_report.csv",
             "📋 Logs brutos (server_logs.csv)": "server_logs.csv",
         }
-        selected_local = st.selectbox("Arquivo local:", list(local_files.keys()))
+        
+        if "selected_local_file" not in st.session_state:
+            st.session_state["selected_local_file"] = "📋 Logs brutos (server_logs.csv)"
+
+        selected_local = st.selectbox(
+            "Arquivo local:", 
+            list(local_files.keys()),
+            key="selected_local_file"
+        )
         local_path = local_files[selected_local]
 
         if os.path.exists(local_path):
@@ -484,17 +272,10 @@ with st.sidebar:
     api_ok, missing_keys = check_api_keys()
 
     if not api_ok:
-        st.markdown(
-            f'<div class="alert-warning">⚠️ Chaves ausentes no <code>.env</code>:<br>'
-            f'<strong>{", ".join(missing_keys)}</strong></div>',
-            unsafe_allow_html=True,
-        )
+        st.warning(f"⚠️ Chaves ausentes no `.env`:\n**{', '.join(missing_keys)}**")
         st.caption("Configure o arquivo `.env` para habilitar o enriquecimento de IPs.")
     else:
-        st.markdown(
-            '<div class="alert-success">🔑 APIs configuradas e prontas</div>',
-            unsafe_allow_html=True,
-        )
+        st.success("🔑 APIs configuradas e prontas")
 
     run_analysis_btn = st.button(
         "🚀 Executar Análise Completa",
@@ -539,29 +320,38 @@ df = uploaded_df.copy()
 
 # ── Execução da análise (quando botão é pressionado) ─────────────────────────
 if run_analysis_btn:
-    # Salva CSV temporário se veio de upload
-    tmp_path = "server_logs.csv"
-    df.to_csv(tmp_path, index=False)
+    # Remove colunas antigas de enriquecimento para evitar sufixos _x e _y em análises re-aplicadas
+    colunas_intel = ["malicious_votes", "attacker_org", "attacker_os", "open_ports"]
+    for col in colunas_intel:
+        if col in df.columns:
+            df.drop(columns=[col], inplace=True)
+
+    # Usa um arquivo temporário seguro para evitar Race Conditions (Segurança) e não sobrescrever o log original
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
+        tmp_path = tmp.name
+        df.to_csv(tmp_path, index=False)
 
     with st.spinner(""):
         result = run_analysis(tmp_path)
+    
+    # Limpeza segura do arquivo temporário
+    if os.path.exists(tmp_path):
+        os.remove(tmp_path)
 
     if result is not None:
         df = result
-        st.markdown(
-            '<div class="alert-success">✅ Análise concluída! Relatório salvo em <code>threat_intel_report.csv</code></div>',
-            unsafe_allow_html=True,
-        )
+        st.success("✅ Análise concluída! Relatório salvo em `threat_intel_report.csv`")
+        # Seta a flag de redirecionamento para o próximo loop (evita StreamlitAPIException)
+        st.session_state["_redirect_to_enriched"] = True
         st.rerun()
 
 # ── Detecta se temos dados enriquecidos ──────────────────────────────────────
 has_intel = "malicious_votes" in df.columns
 
 if not has_intel:
-    st.markdown(
-        '<div class="alert-info">ℹ️ Exibindo dados brutos de logs. '
-        'Para ver o enriquecimento de Threat Intelligence, execute a análise completa na sidebar.</div>',
-        unsafe_allow_html=True,
+    st.info(
+        "ℹ️ Exibindo dados brutos de logs. "
+        "Para ver o enriquecimento de Threat Intelligence, execute a análise completa na sidebar."
     )
 else:
     pdf_bytes = pdf_generator.generate_pdf_report(df)
@@ -572,11 +362,7 @@ else:
         mime="application/pdf",
     )
 
-# =============================================================================
-# SEÇÃO 1 — METRIC CARDS
-# =============================================================================
-
-st.markdown(section_header("Visão Geral", "LIVE"), unsafe_allow_html=True)
+st.markdown("## Visão Geral")
 
 total_ips = df["source_ip"].nunique()
 total_registros = len(df)
@@ -591,35 +377,30 @@ else:
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    st.markdown(
-        metric_card(
-            "IPs Únicos Analisados", total_ips, "blue", "🌐",
-            f"{total_registros} eventos no total"
-        ),
-        unsafe_allow_html=True,
+    st.metric(
+        label="🌐 IPs Únicos Analisados", 
+        value=total_ips, 
+        delta=f"{total_registros} eventos no total",
+        delta_color="off"
     )
 
 with col2:
-    st.markdown(
-        metric_card(
-            "IPs Maliciosos Detectados",
-            malicious_ips if has_intel else "—",
-            "red", "🚨",
-            "Baseado em votos VirusTotal" if has_intel else "Execute a análise para obter"
-        ),
-        unsafe_allow_html=True,
+    st.metric(
+        label="🚨 IPs Maliciosos", 
+        value=malicious_ips if has_intel else "—",
+        delta="Baseado do VT" if has_intel else "Execute análise",
+        delta_color="off" if not has_intel else "inverse"
     )
 
 with col3:
-    st.markdown(
-        metric_card(
-            "Ações Bloqueadas (DENY+DROP)", deny_count, "orange", "🔒",
-            f"{deny_count/total_registros*100:.1f}% do tráfego total"
-        ),
-        unsafe_allow_html=True,
+    st.metric(
+        label="🔒 Ações Bloqueadas", 
+        value=deny_count,
+        delta=f"{deny_count/total_registros*100:.1f}% do tráfego total",
+        delta_color="off"
     )
 
-st.markdown("<br>", unsafe_allow_html=True)
+st.divider()
 
 # =============================================================================
 # SEÇÃO 2 — GRÁFICOS
@@ -629,7 +410,7 @@ chart_col, dist_col = st.columns([3, 2])
 
 # ── Gráfico de barras: portas mais atacadas ───────────────────────────────────
 with chart_col:
-    st.markdown(section_header("🎯 Portas de Destino Mais Atacadas", "TOP TARGETS"), unsafe_allow_html=True)
+    st.markdown("### 🎯 Portas de Destino Mais Atacadas")
 
     port_counts = (
         df.groupby("destination_port")
@@ -689,8 +470,29 @@ with chart_col:
 
 
 # ── Gráfico de pizza: distribuição de ações ───────────────────────────────────
+# ── Gráfico de pizza de Ações e Shodan ───────────────────────────────────
 with dist_col:
-    st.markdown(section_header("⚡ Distribuição de Ações", "BREAKDOWN"), unsafe_allow_html=True)
+    st.markdown("### 🔍 Inteligência Ofensora (Shodan API)")
+
+    if has_intel and "attacker_org" in df.columns:
+        org_df = df[df["attacker_org"] != "Unknown"]
+        if not org_df.empty:
+            org_counts = org_df["attacker_org"].value_counts().reset_index()
+            org_counts.columns = ["Organização", "Ataques"]
+            fig_orgs = px.pie(
+                org_counts.head(5), names="Organização", values="Ataques", hole=0.4,
+                color_discrete_sequence=px.colors.sequential.Agsunset
+            )
+            fig_orgs.update_layout(
+                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)",
+                font=dict(color="#a0aec0", family="Inter"),
+                margin=dict(l=0, r=0, t=10, b=0)
+            )
+            st.plotly_chart(fig_orgs, use_container_width=True)
+        else:
+            st.info("Nenhuma Organização identificada pelo Shodan (IPs Residênciais/Não indexados)")
+    else:
+        st.info("Informações do Shodan não disponíveis. Execute a Análise Completa.")
 
     action_counts = df["action"].value_counts().reset_index()
     action_counts.columns = ["action", "count"]
@@ -743,7 +545,7 @@ with dist_col:
 # SEÇÃO 3 — TABELA INTERATIVA COM HIGHLIGHT
 # =============================================================================
 
-st.markdown(section_header("📋 Log de Eventos — Detalhes", "INTERACTIVE"), unsafe_allow_html=True)
+st.markdown("### 📋 Log de Eventos — Detalhes")
 
 # Filtros inline
 filter_col1, filter_col2, filter_col3 = st.columns([2, 2, 3])
@@ -824,7 +626,7 @@ st.caption(f"Exibindo {len(df_filtered)} de {len(df)} registros")
 # =============================================================================
 
 if has_intel:
-    st.markdown(section_header("🎯 Top IPs de Maior Risco", "THREAT ACTORS"), unsafe_allow_html=True)
+    st.markdown("### 🎯 Top IPs de Maior Risco")
 
     df_ip_summary = (
         df.groupby("source_ip")

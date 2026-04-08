@@ -27,13 +27,6 @@ from dotenv import load_dotenv
 # CONFIGURAÇÕES E CONSTANTES
 # =============================================================================
 
-# Carrega variáveis do arquivo .env no diretório atual
-load_dotenv()
-
-# Chaves de API lidas do ambiente (nunca hardcodadas)
-VT_API_KEY = os.getenv("VT_API_KEY")
-SHODAN_API_KEY = os.getenv("SHODAN_API_KEY")
-
 # VirusTotal: conta Free permite 4 requisições/minuto
 # Usamos 15s de intervalo para ficar bem abaixo do limite e evitar bloqueios
 VT_RATE_LIMIT_SLEEP = 15  # segundos entre cada chamada ao VT
@@ -71,20 +64,25 @@ class ThreatIntelAnalyzer:
                 "Execute 'generate_logs.py' primeiro."
             )
 
-        if not VT_API_KEY:
+        # Carrega variáveis de ambiente aqui para garantir leitura atualizada (hot-swap)
+        load_dotenv(override=True)
+        self.vt_api_key = os.getenv("VT_API_KEY")
+        self.shodan_api_key = os.getenv("SHODAN_API_KEY")
+
+        if not self.vt_api_key or self.vt_api_key == "sua_chave_virustotal_aqui":
             raise EnvironmentError(
-                "[ERRO] VT_API_KEY não encontrada. "
+                "[ERRO] VT_API_KEY não configurada validamente. "
                 "Configure o arquivo .env com sua chave do VirusTotal."
             )
 
-        if not SHODAN_API_KEY:
+        if not self.shodan_api_key or self.shodan_api_key == "sua_chave_shodan_aqui":
             raise EnvironmentError(
-                "[ERRO] SHODAN_API_KEY não encontrada. "
+                "[ERRO] SHODAN_API_KEY não configurada validamente. "
                 "Configure o arquivo .env com sua chave do Shodan."
             )
 
         self.log_file = log_file
-        self.shodan_client = shodan.Shodan(SHODAN_API_KEY)
+        self.shodan_client = shodan.Shodan(self.shodan_api_key)
 
         print(f"[+] ThreatIntelAnalyzer inicializado.")
         print(f"[+] Fonte de logs: '{self.log_file}'")
@@ -113,7 +111,7 @@ class ThreatIntelAnalyzer:
         time.sleep(VT_RATE_LIMIT_SLEEP)
 
         try:
-            headers = {"x-apikey": VT_API_KEY}
+            headers = {"x-apikey": self.vt_api_key}
             response = requests.get(
                 VT_IP_URL.format(ip=ip),
                 headers=headers,

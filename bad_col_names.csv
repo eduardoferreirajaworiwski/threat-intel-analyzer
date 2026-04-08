@@ -1,3 +1,0 @@
-Momento,Endereco,PortaDestino,Decisao
-2026-04-01 00:00:00,8.8.8.8,443,DENY
-2026-04-01 01:00:00,10.0.0.1,80,ALLOW
