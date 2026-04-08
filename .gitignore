@@ -1,0 +1,11 @@
+# Ignorar dados e relatórios gerados
+server_logs.csv
+threat_intel_report.csv
+
+# Nunca versionar segredos!
+.env
+
+# Ambiente virtual Python
+venv/
+__pycache__/
+*.pyc
